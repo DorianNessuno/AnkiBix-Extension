@@ -273,13 +273,28 @@ class IndiaBixScraper:
                 all_links = first_page_soup.find_all('a', href=True)
                 base_path = urlparse(url).path.rstrip('/')
                 
+                # 1. Extract all 6-digit suffixes found in the links
+                numeric_suffixes = []
                 for link in all_links:
-                    href = link.get('href')
-                    # Match IndiaBix pagination: /category/subcategory/006001
-                    if href and base_path in href and re.search(r'/\d{6}$', href):
-                        full_url = urljoin(url, href)
+                    href = link.get('href', '')
+                    match = re.search(r'/(\d{6})$', href)
+                    if match and base_path in href:
+                        numeric_suffixes.append(int(match.group(1)))
+
+                if numeric_suffixes:
+                    # 2. Determine the range (from the first page to the last found page)
+                    start_page = min(numeric_suffixes)
+                    end_page = max(numeric_suffixes)
+                    
+                    # 3. Generate all URLs in between (filling potential gaps)
+                    # We use f-string with :06d to maintain the 6-digit format with leading zeros
+                    for i in range(start_page, end_page + 1):
+                        full_url = urljoin(url, f"{base_path}/{i:06d}")
                         if full_url not in page_urls:
                             page_urls.append(full_url)
+                else:
+                    # Fallback: if no pagination found, just use the current URL
+                    page_urls = [url]
                 
                 # Limit to max_pages
                 page_urls = page_urls[:max_pages]
